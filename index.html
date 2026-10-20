@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Port</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Port">
+<meta name="theme-color" content="#F4F5F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A0C10" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root {
+  --bg: #F4F5F7; --fg: #121519; --muted: #737A85; --hair: rgba(18,21,25,.12);
+  --sheet: #FFFFFF; --press: rgba(18,21,25,.05); --up: #1E9E5A; --down: #D9483E;
+  --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px); --sar: env(safe-area-inset-right, 0px);
+  --kb: 0px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #0A0C10; --fg: #EDEFF2; --muted: #848B96; --hair: rgba(237,239,242,.14);
+    --sheet: #171A1F; --press: rgba(237,239,242,.06); --up: #3FD68E; --down: #F26B62; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #0A0C10; --fg: #EDEFF2; --muted: #848B96; --hair: rgba(237,239,242,.14);
+  --sheet: #171A1F; --press: rgba(237,239,242,.06); --up: #3FD68E; --down: #F26B62; color-scheme: dark; }
+html, body { height: 100%; margin: 0; overflow: hidden; position: fixed; width: 100%; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 17px; line-height: 1.3;
+  -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; font-variant-numeric: tabular-nums;
+  overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+* { box-sizing: border-box; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+input, select { -webkit-user-select: text; user-select: text; }
+[hidden] { display: none !important; }
+
+.app { position: absolute; inset: 0; overflow: hidden; background: var(--bg); }
+
+.bar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+  padding-top: var(--sat); height: calc(var(--sat) + 52px);
+  display: flex; align-items: center; justify-content: space-between;
+  padding-left: max(8px, var(--sal)); padding-right: max(8px, var(--sar));
+  background: var(--bg);
+}
+.bar::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--hair); opacity: 0; transition: opacity .2s; }
+.app.scrolled .bar::after { opacity: 1; }
+.ib { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 22px; color: var(--fg); }
+.ib:active { background: var(--press); }
+.ib svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 1.75; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+.scroll {
+  position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding-top: calc(var(--sat) + 52px); padding-bottom: calc(var(--sab) + 40px);
+  padding-left: max(20px, var(--sal)); padding-right: max(20px, var(--sar));
+  transition: transform .25s cubic-bezier(.2,.8,.2,1);
+}
+.scroll.dragging { transition: none; }
+.ptr { position: absolute; top: calc(var(--sat) + 52px); left: 0; right: 0; height: 56px; display: grid; place-items: center; opacity: 0; transition: opacity .15s; pointer-events: none; }
+.ptr.show { opacity: 1; }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--hair); border-top-color: var(--muted); transform: rotate(var(--rot, 0deg)); }
+.ptr.spinning .spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.hero { text-align: center; padding-top: 38px; padding-bottom: 34px; }
+.total { font-size: 46px; font-weight: 300; letter-spacing: -0.03em; line-height: 1.1; }
+.total .cur { color: var(--muted); }
+.notice { margin-top: 10px; font-size: 13px; color: var(--muted); }
+
+.list { list-style: none; margin: 0; padding: 0; }
+.acct { display: block; text-align: left; padding: 14px 12px 0; margin: 0 -12px; width: calc(100% + 24px); border-radius: 12px; }
+.acct:active { background: var(--press); }
+.r1, .r2 { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.r1 { font-weight: 500; }
+.name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r2 { margin-top: 2px; font-size: 14px; color: var(--muted); }
+.pnl { font-weight: 600; }
+.pnl.up { color: var(--up); }
+.pnl.down { color: var(--down); }
+.share { position: relative; height: 2px; margin-top: 12px; background: var(--hair); border-radius: 1px; overflow: hidden; }
+.share i { position: absolute; inset: 0 auto 0 0; width: var(--w); background: var(--fg); border-radius: 1px; transition: width .4s ease; }
+.empty { text-align: center; color: var(--muted); padding: 40px 0; font-size: 15px; }
+
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 20; }
+.scrim.on { opacity: 1; pointer-events: auto; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: var(--kb); z-index: 21; max-height: calc(100% - var(--sat) - 20px); overflow-y: auto;
+  background: var(--sheet); border-radius: 22px 22px 0 0;
+  padding: 10px max(20px, var(--sar)) calc(var(--sab) + 24px) max(20px, var(--sal));
+  transform: translateY(110%); transition: transform .3s cubic-bezier(.2,.8,.2,1), bottom .2s;
+  box-shadow: 0 -1px 0 var(--hair);
+}
+.sheet.on { transform: translateY(0); }
+.handle { width: 36px; height: 5px; border-radius: 3px; background: var(--hair); margin: 0 auto 14px; }
+.sheet h2 { font-size: 20px; font-weight: 600; margin: 0 0 16px; letter-spacing: -0.01em; }
+.group { background: var(--bg); border-radius: 14px; overflow: hidden; margin-bottom: 14px; }
+.field { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px; position: relative; width: 100%; }
+.field + .field::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--hair); }
+.field > span:first-child { flex: 0 0 76px; color: var(--muted); font-size: 15px; }
+.field input, .field select {
+  flex: 1; min-width: 0; font: inherit; color: var(--fg); background: none; border: 0; padding: 0; text-align: right;
+  font-variant-numeric: tabular-nums; appearance: none; -webkit-appearance: none;
+}
+.field select { direction: rtl; }
+.field select option, .field select optgroup { direction: ltr; }
+.field em { font-style: normal; color: var(--muted); font-size: 15px; }
+.field .pnlv { flex: 1; text-align: right; font-weight: 600; }
+.field .pnlv small { font-size: 15px; font-weight: 500; color: var(--muted); margin-left: 10px; }
+.field.link { justify-content: space-between; text-align: left; }
+.field.link > span:first-child { flex: 1; color: var(--fg); font-size: 17px; }
+.field.link > span:last-child { color: var(--muted); font-size: 15px; }
+.field.link svg { width: 16px; height: 16px; stroke: var(--muted); stroke-width: 2; fill: none; stroke-linecap: round; flex: 0 0 auto; }
+.field.link.dis { opacity: .45; }
+.toggle { flex: 0 0 auto; margin-left: auto; width: 50px; height: 30px; border-radius: 15px; background: var(--hair); position: relative; transition: background .2s; }
+.toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 26px; height: 26px; border-radius: 50%; background: var(--sheet); box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+.toggle.on { background: var(--up); }
+.toggle.on::after { transform: translateX(20px); }
+.toggle:disabled { opacity: .4; }
+.primary { width: 100%; height: 50px; border-radius: 14px; background: var(--fg); color: var(--bg); font-weight: 600; font-size: 17px; }
+.primary:active { opacity: .85; }
+.primary:disabled { opacity: .4; }
+.danger { width: 100%; height: 44px; margin-top: 6px; color: var(--down); font-weight: 500; }
+.quiet { width: 100%; height: 44px; margin-top: 6px; color: var(--muted); font-weight: 500; }
+.note { color: var(--muted); font-size: 13px; line-height: 1.45; margin: 4px 4px 0; }
+.err { color: var(--down); font-size: 14px; margin: 0 4px 12px; min-height: 1.2em; }
+.confirm { background: var(--bg); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; font-size: 15px; display: flex; flex-direction: column; gap: 10px; }
+.confirm .row { display: flex; gap: 10px; }
+.confirm .row button { flex: 1; height: 40px; border-radius: 10px; font-weight: 600; }
+.confirm .yes { background: var(--fg); color: var(--bg); }
+.confirm .no { background: var(--hair); }
+
+.lock { position: absolute; inset: 0; z-index: 40; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 0 32px; transition: opacity .25s; }
+.lock.off { opacity: 0; pointer-events: none; }
+.faceid { width: 64px; height: 64px; stroke: var(--fg); stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.lock .primary { width: auto; min-width: 220px; padding: 0 28px; }
+.pinbox { width: 220px; height: 50px; border-radius: 14px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--hair); text-align: center; font-size: 24px; letter-spacing: .4em; color: var(--fg); border: 0; }
+.pinbox:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--fg); }
+.lock .err { text-align: center; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) { .scroll, .sheet, .scrim, .lock, .share i, .toggle::after { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="bar">
+    <button class="ib" id="btnSettings" aria-label="Settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+    <button class="ib" id="btnAdd" aria-label="Add account"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  </header>
+
+  <div class="ptr" id="ptr"><span class="spin"></span></div>
+
+  <main class="scroll" id="scroll">
+    <section class="hero">
+      <div class="total" id="total"></div>
+      <div class="notice" id="notice" hidden></div>
+    </section>
+    <ul class="list" id="list"></ul>
+  </main>
+
+  <div class="scrim" id="scrim"></div>
+
+  <section class="sheet" id="sheetEdit" aria-label="Edit account">
+    <div class="handle"></div>
+    <h2 id="editTitle">Edit account</h2>
+    <div class="group">
+      <label class="field"><span>Name</span><input id="fName" type="text" autocomplete="off" autocapitalize="words" placeholder="Account"></label>
+      <label class="field"><span>Asset</span><select id="fAsset"></select></label>
+      <label class="field"><span>Units</span><input id="fUnits" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+      <label class="field" id="rowCost"><span>Cost</span><input id="fCost" inputmode="decimal" autocomplete="off" placeholder="0"><em id="costCur">USD</em></label>
+      <div class="field" id="rowPnl" hidden><span>PNL</span><span class="pnlv" id="fPnl"></span></div>
+    </div>
+    <div class="err" id="editErr"></div>
+    <button class="primary" id="btnSave">Save</button>
+    <button class="danger" id="btnDelete">Delete account</button>
+  </section>
+
+  <section class="sheet" id="sheetSettings" aria-label="Settings">
+    <div class="handle"></div>
+    <h2>Settings</h2>
+    <div class="group">
+      <label class="field"><span>Currency</span><select id="fBase"></select></label>
+      <div class="field"><span>Face ID</span><button class="toggle" id="tglFace" role="switch" aria-checked="false" aria-label="Require Face ID"></button></div>
+      <button class="field link" id="btnPin"><span>PIN</span><span id="pinState">Off</span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+    <div class="err" id="setErr"></div>
+    <div class="confirm" id="importConfirm" hidden>
+      <div id="importMsg"></div>
+      <div class="row"><button class="no" id="importNo">Cancel</button><button class="yes" id="importYes">Replace</button></div>
+    </div>
+    <div class="group">
+      <button class="field link" id="btnExport"><span>Export data</span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      <button class="field link" id="btnImport"><span>Import data</span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      <button class="field link" id="btnLock"><span>Lock now</span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+    <input type="file" id="fileImport" accept=".json,application/json" hidden>
+    <p class="note">Prices from CoinGecko and the European Central Bank. Your amounts never leave this phone.</p>
+  </section>
+
+  <section class="sheet" id="sheetPin" aria-label="PIN">
+    <div class="handle"></div>
+    <h2 id="pinTitle">Set a PIN</h2>
+    <p class="note" id="pinHint" style="margin-bottom:14px">4 to 8 digits. You'll need it if Face ID is unavailable.</p>
+    <div class="group">
+      <label class="field"><span id="pinLabel1">PIN</span><input id="fPin1" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••"></label>
+      <label class="field" id="rowPin2"><span>Again</span><input id="fPin2" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••"></label>
+    </div>
+    <div class="err" id="pinErr"></div>
+    <button class="primary" id="btnPinOk">Continue</button>
+    <button class="danger" id="btnPinRemove" hidden>Remove PIN</button>
+  </section>
+
+  <div class="lock off" id="lock">
+    <svg class="faceid" id="faceGlyph" viewBox="0 0 64 64">
+      <path d="M8 20V12a4 4 0 0 1 4-4h8M44 8h8a4 4 0 0 1 4 4v8M56 44v8a4 4 0 0 1-4 4h-8M20 56h-8a4 4 0 0 1-4-4v-8"/>
+      <path d="M22 26v5M42 26v5M32 26v10a2 2 0 0 1-2 2h-1"/>
+      <path d="M23 43c2.5 2.6 5.5 4 9 4s6.5-1.4 9-4"/>
+    </svg>
+    <button class="primary" id="btnUnlockFace">Unlock with Face ID</button>
+    <form id="pinForm" hidden><input class="pinbox" id="lockPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN" aria-label="PIN"></form>
+    <div class="err" id="lockErr"></div>
+    <button class="quiet" id="btnUsePin" hidden>Use PIN</button>
+  </div>
+</div>
+
+<script>
+// @core-start
+const FIAT = ['USD','EUR','THB','GBP','CHF','JPY','SGD','AUD','CAD','HKD','CNY','SEK','NOK','DKK','PLN','CZK','NZD','KRW','INR','MXN','BRL','ZAR','TRY','ILS','HUF','RON','PHP','MYR','IDR','ISK','BGN'];
+const CRYPTO = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', XRP: 'ripple', ADA: 'cardano', DOGE: 'dogecoin', LTC: 'litecoin', DOT: 'polkadot', LINK: 'chainlink', AVAX: 'avalanche-2', BNB: 'binancecoin', XMR: 'monero', USDT: 'tether', USDC: 'usd-coin' };
+const isCrypto = c => Object.prototype.hasOwnProperty.call(CRYPTO, c);
+
+// "20,100" is twenty thousand one hundred; "0,65" is a decimal; "1.234,5" is European. Handles all three.
+function parseNum(s) {
+  s = String(s ?? '').trim().replace(/\s|'/g, '');
+  if (!s) return NaN;
+  const lc = s.lastIndexOf(','), ld = s.lastIndexOf('.');
+  if (lc >= 0 && ld >= 0) s = lc > ld ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  else if (lc >= 0) {
+    const parts = s.split(',');
+    const grouping = parts.length >= 2 && parts.slice(1).every(p => p.length === 3);
+    s = grouping ? parts.join('') : parts.join('.');
+  }
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function computeRows(accounts, rates, base) {
+  const baseRate = rates[base];
+  const rows = accounts.map(a => {
+    const r = rates[a.asset];
+    const value = (r && baseRate) ? a.units * r / baseRate : null;
+    let pnl = null;
+    if (isCrypto(a.asset) && a.cost > 0 && r && rates[a.costCur || 'USD']) {
+      pnl = (a.units * r / rates[a.costCur || 'USD']) / a.cost - 1;
+    }
+    return { a, value, pnl };
+  });
+  const total = rows.reduce((s, r) => s + (r.value || 0), 0);
+  for (const r of rows) r.share = (total > 0 && r.value) ? r.value / total : 0;
+  rows.sort((x, y) => (y.value || 0) - (x.value || 0));
+  return { rows, total };
+}
+
+const fmtMoney = (v, cur) => new Intl.NumberFormat('en-US', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(v);
+const fmtUnits = (v, asset) => new Intl.NumberFormat('en-US', { maximumFractionDigits: isCrypto(asset) ? 6 : 0 }).format(v) + ' ' + asset;
+const fmtPct = p => (p >= 0 ? '+' : '−') + Math.abs(p * 100).toFixed(1) + '%';
+const fmtInput = (v, asset) => new Intl.NumberFormat('en-US', { maximumFractionDigits: isCrypto(asset) ? 8 : 2, useGrouping: false }).format(v);
+
+// Crypto primitives. A random data key encrypts the accounts; it is wrapped by a PIN key and/or a Face ID (PRF) key.
+const subtle = globalThis.crypto.subtle;
+const te = new TextEncoder(), td = new TextDecoder();
+const b64u = {
+  enc: buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+  dec: s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
+};
+const rand = n => globalThis.crypto.getRandomValues(new Uint8Array(n));
+const importAes = raw => subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+async function aesEncrypt(key, bytes) {
+  const iv = rand(12);
+  const ct = await subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes);
+  return { iv: b64u.enc(iv), ct: b64u.enc(ct) };
+}
+async function aesDecrypt(key, box) {
+  return new Uint8Array(await subtle.decrypt({ name: 'AES-GCM', iv: b64u.dec(box.iv) }, key, b64u.dec(box.ct)));
+}
+async function pinKey(pin, saltB64) {
+  const base = await subtle.importKey('raw', te.encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return subtle.deriveKey({ name: 'PBKDF2', salt: b64u.dec(saltB64), iterations: 300000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function prfKey(prfBytes) {
+  const base = await subtle.importKey('raw', prfBytes, 'HKDF', false, ['deriveKey']);
+  return subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: te.encode('port-dek-wrap') }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+const wrapDek = (wrapKey, dekRaw) => aesEncrypt(wrapKey, dekRaw);
+const unwrapDek = (wrapKey, box) => aesDecrypt(wrapKey, box);
+const encryptData = async (dek, obj) => aesEncrypt(dek, te.encode(JSON.stringify(obj)));
+const decryptData = async (dek, box) => JSON.parse(td.decode(await aesDecrypt(dek, box)));
+
+function validateImport(obj) {
+  if (!obj || typeof obj !== 'object' || !Array.isArray(obj.accounts)) throw new Error('Not a Port backup file.');
+  const accounts = obj.accounts.map((a, i) => {
+    if (!a || typeof a.asset !== 'string' || !(FIAT.includes(a.asset) || isCrypto(a.asset))) throw new Error(`Account ${i + 1} has an unknown asset.`);
+    const units = Number(a.units);
+    if (!Number.isFinite(units) || units < 0) throw new Error(`Account ${i + 1} has invalid units.`);
+    const out = { id: Number(a.id) || i + 1, name: String(a.name || a.asset).slice(0, 60), asset: a.asset, units };
+    if (a.cost != null && Number.isFinite(Number(a.cost)) && Number(a.cost) > 0) { out.cost = Number(a.cost); out.costCur = FIAT.includes(a.costCur) ? a.costCur : 'USD'; }
+    return out;
+  });
+  const base = FIAT.includes(obj.base) ? obj.base : null;
+  return { accounts, base };
+}
+// @core-end
+
+if (typeof document !== 'undefined') (function () {
+  const $ = id => document.getElementById(id);
+  const app = $('app'), scroll = $('scroll'), list = $('list'), ptr = $('ptr'), scrim = $('scrim'), lock = $('lock');
+  const sheets = { edit: $('sheetEdit'), settings: $('sheetSettings'), pin: $('sheetPin') };
+
+  // ---------- storage ----------
+  const LS = {
+    get(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.error(e); } },
+  };
+  let meta = LS.get('port.meta') || { v: 1, base: 'USD', assets: [], pin: null, face: null };
+  let rates = (LS.get('port.rates') || {}).rates || { USD: 1 };
+  let dek = null;          // CryptoKey while unlocked, when a lock is set
+  let dekRaw = null;       // raw bytes, needed to wrap for a newly enabled method
+  let data = null;         // { accounts: [] } while unlocked
+  let priceFailed = false;
+
+  const lockEnabled = () => !!(meta.pin || meta.face);
+  function saveMeta() { LS.set('port.meta', meta); }
+  async function saveData() {
+    meta.assets = [...new Set(data.accounts.map(a => a.asset))];
+    saveMeta();
+    if (dek) LS.set('port.data', { enc: await encryptData(dek, data) });
+    else LS.set('port.data', { plain: data });
+  }
+
+  // ---------- render ----------
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function render() {
+    if (!data) return;
+    const { rows, total } = computeRows(data.accounts, rates, meta.base);
+    const t = fmtMoney(total, meta.base);
+    const m = t.match(/^([^\d]+)(.*)$/);
+    $('total').innerHTML = m ? `<span class="cur">${esc(m[1])}</span>${esc(m[2])}` : esc(t);
+    const missing = rows.some(r => r.value == null);
+    const n = $('notice');
+    n.hidden = !(priceFailed || missing);
+    n.textContent = priceFailed ? 'Prices could not be refreshed. Showing last known values.' : missing ? 'Some prices are not available yet.' : '';
+
+    list.innerHTML = '';
+    if (!rows.length) { list.innerHTML = '<li class="empty">Tap + to add your first account</li>'; return; }
+    for (const { a, value, pnl, share } of rows) {
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.className = 'acct';
+      btn.innerHTML = `
+        <div class="r1"><span class="name">${esc(a.name)}</span><span>${value == null ? '—' : esc(fmtMoney(value, meta.base))}</span></div>
+        <div class="r2"><span>${esc(fmtUnits(a.units, a.asset))}</span>${pnl == null ? '' : `<span class="pnl ${pnl >= 0 ? 'up' : 'down'}">${fmtPct(pnl)}</span>`}</div>
+        <div class="share" aria-label="${(share * 100).toFixed(1)}% of total"><i style="--w:${(share * 100).toFixed(2)}%"></i></div>`;
+      btn.addEventListener('click', () => openEdit(a.id));
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  // ---------- prices ----------
+  let lastFetch = 0, fetching = null;
+  async function fetchPrices() {
+    if (fetching) return fetching;
+    fetching = (async () => {
+      const codes = new Set([...(meta.assets || []), meta.base]);
+      const fiat = [...codes].filter(c => FIAT.includes(c) && c !== 'USD');
+      const cry = [...codes].filter(isCrypto);
+      const out = {}; let ok = true;
+      const jobs = [];
+      if (fiat.length) jobs.push(fetch(`https://api.frankfurter.dev/v1/latest?base=USD&symbols=${fiat.join(',')}`)
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(j => { for (const [k, v] of Object.entries(j.rates || {})) if (v > 0) out[k] = 1 / v; })
+        .catch(() => { ok = false; }));
+      if (cry.length) jobs.push(fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cry.map(c => CRYPTO[c]).join(',')}&vs_currencies=usd`)
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(j => { for (const c of cry) if (j[CRYPTO[c]] && j[CRYPTO[c]].usd > 0) out[c] = j[CRYPTO[c]].usd; })
+        .catch(() => { ok = false; }));
+      await Promise.all(jobs);
+      rates = { ...rates, ...out, USD: 1 };
+      priceFailed = !ok;
+      if (Object.keys(out).length) LS.set('port.rates', { rates, at: Date.now() });
+      lastFetch = Date.now();
+      render();
+    })().finally(() => { fetching = null; });
+    return fetching;
+  }
+
+  // ---------- sheets ----------
+  function openSheet(name) { scrim.classList.add('on'); for (const k in sheets) sheets[k].classList.toggle('on', k === name); }
+  function closeSheets() {
+    scrim.classList.remove('on'); for (const k in sheets) sheets[k].classList.remove('on');
+    confirmDelete = false; $('btnDelete').textContent = 'Delete account'; $('editErr').textContent = ''; $('setErr').textContent = '';
+    $('importConfirm').hidden = true; pendingImport = null; pinAfter = null;
+    document.activeElement && document.activeElement.blur && document.activeElement.blur();
+  }
+  scrim.addEventListener('click', closeSheets);
+
+  // Asset and currency selects
+  (function fillSelects() {
+    const sel = $('fAsset');
+    const g1 = document.createElement('optgroup'); g1.label = 'Currencies';
+    for (const c of FIAT) g1.appendChild(new Option(c, c));
+    const g2 = document.createElement('optgroup'); g2.label = 'Crypto';
+    for (const c of Object.keys(CRYPTO)) g2.appendChild(new Option(c, c));
+    sel.append(g1, g2);
+    for (const c of FIAT) $('fBase').appendChild(new Option(c, c));
+  })();
+
+  // ---------- edit ----------
+  let editing = null, confirmDelete = false, pnlLine = '';
+  function openEdit(id) {
+    editing = id == null ? null : data.accounts.find(a => a.id === id) || null;
+    $('editTitle').textContent = editing ? 'Edit account' : 'New account';
+    $('fName').value = editing ? editing.name : '';
+    $('fAsset').value = editing ? editing.asset : 'EUR';
+    $('fUnits').value = editing ? fmtInput(editing.units, editing.asset) : '';
+    $('fCost').value = editing && editing.cost ? fmtInput(editing.cost, 'USD') : '';
+    $('costCur').textContent = editing && editing.costCur ? editing.costCur : meta.base;
+    $('btnDelete').hidden = !editing;
+    // Realised-looking PNL in the cost currency, for crypto with a cost basis.
+    pnlLine = '';
+    if (editing && isCrypto(editing.asset) && editing.cost > 0) {
+      const cc = editing.costCur || 'USD', r = rates[editing.asset];
+      if (r && rates[cc]) {
+        const diff = editing.units * r / rates[cc] - editing.cost;
+        pnlLine = `<span class="pnl ${diff >= 0 ? 'up' : 'down'}">${(diff >= 0 ? '+' : '\u2212') + esc(fmtMoney(Math.abs(diff), cc))}</span><small>${fmtPct(diff / editing.cost)}</small>`;
+      }
+    }
+    $('fPnl').innerHTML = pnlLine;
+    syncCostRow();
+    openSheet('edit');
+    if (!editing) setTimeout(() => $('fName').focus(), 350);
+  }
+  function syncCostRow() {
+    $('rowCost').hidden = !isCrypto($('fAsset').value);
+    $('rowPnl').hidden = !(pnlLine && editing && $('fAsset').value === editing.asset);
+  }
+  $('fAsset').addEventListener('change', () => { syncCostRow(); if (!editing || !editing.costCur) $('costCur').textContent = meta.base; });
+  $('btnAdd').addEventListener('click', () => openEdit(null));
+  $('btnSave').addEventListener('click', async () => {
+    const asset = $('fAsset').value;
+    const name = $('fName').value.trim().slice(0, 60) || asset;
+    const units = parseNum($('fUnits').value);
+    if (!(units >= 0)) { $('editErr').textContent = 'Enter the number of units.'; return; }
+    const rec = { id: editing ? editing.id : Date.now(), name, asset, units };
+    if (isCrypto(asset)) {
+      const cost = parseNum($('fCost').value);
+      if ($('fCost').value.trim() && !(cost >= 0)) { $('editErr').textContent = 'Enter the total cost as a number.'; return; }
+      if (cost > 0) { rec.cost = cost; rec.costCur = (editing && editing.costCur) || meta.base; }
+    }
+    if (editing) Object.assign(editing, rec, { cost: rec.cost, costCur: rec.costCur });
+    else data.accounts.push(rec);
+    if (editing && !rec.cost) { delete editing.cost; delete editing.costCur; }
+    await saveData(); render(); closeSheets();
+    if (!(asset in rates)) fetchPrices();
+  });
+  $('btnDelete').addEventListener('click', async () => {
+    if (!confirmDelete) { confirmDelete = true; $('btnDelete').textContent = 'Tap again to delete'; return; }
+    data.accounts = data.accounts.filter(a => a !== editing);
+    await saveData(); render(); closeSheets();
+  });
+
+  // ---------- settings ----------
+  function syncSettings() {
+    $('fBase').value = meta.base;
+    $('tglFace').classList.toggle('on', !!meta.face);
+    $('tglFace').setAttribute('aria-checked', !!meta.face);
+    $('tglFace').disabled = !faceAvailable;
+    $('pinState').textContent = meta.pin ? 'On' : 'Off';
+    $('btnLock').hidden = !lockEnabled();
+  }
+  $('btnSettings').addEventListener('click', () => { syncSettings(); openSheet('settings'); });
+  $('fBase').addEventListener('change', async e => { meta.base = e.target.value; saveMeta(); render(); fetchPrices(); });
+  $('btnLock').addEventListener('click', () => { closeSheets(); hardLock(); });
+
+  // ---------- PIN ----------
+  let pinAfter = null; // callback once a PIN is set
+  function openPinSheet(mode, after) {
+    pinAfter = after || null;
+    $('pinTitle').textContent = mode === 'change' ? 'Change PIN' : 'Set a PIN';
+    $('pinHint').textContent = meta.face || mode === 'face' ? "4 to 8 digits. You'll need it if Face ID is unavailable." : '4 to 8 digits. Asked each time Port opens.';
+    $('fPin1').value = ''; $('fPin2').value = ''; $('pinErr').textContent = '';
+    $('btnPinRemove').hidden = !meta.pin;
+    $('btnPinRemove').textContent = meta.face ? 'Remove PIN and Face ID' : 'Remove PIN';
+    openSheet('pin');
+    setTimeout(() => $('fPin1').focus(), 350);
+  }
+  $('btnPin').addEventListener('click', () => openPinSheet(meta.pin ? 'change' : 'set'));
+  $('btnPinOk').addEventListener('click', async () => {
+    const p1 = $('fPin1').value, p2 = $('fPin2').value;
+    if (!/^\d{4,8}$/.test(p1)) { $('pinErr').textContent = 'Use 4 to 8 digits.'; return; }
+    if (p1 !== p2) { $('pinErr').textContent = "The two entries don't match."; return; }
+    $('btnPinOk').disabled = true;
+    try {
+      await ensureDek();
+      const salt = b64u.enc(rand(16));
+      const key = await pinKey(p1, salt);
+      meta.pin = { salt, len: p1.length, wrap: await wrapDek(key, dekRaw) };
+      await saveData();
+      const after = pinAfter;
+      closeSheets();
+      if (after) after(); else { syncSettings(); openSheet('settings'); }
+    } catch (e) { $('pinErr').textContent = 'Could not set the PIN. ' + (e.message || ''); }
+    $('btnPinOk').disabled = false;
+  });
+  $('btnPinRemove').addEventListener('click', async () => {
+    // Removing the PIN removes the lock entirely; data goes back to plaintext.
+    meta.pin = null; meta.face = null; dek = null; dekRaw = null;
+    await saveData(); closeSheets(); syncSettings(); openSheet('settings');
+  });
+  async function ensureDek() {
+    if (dek) return;
+    dekRaw = rand(32);
+    dek = await importAes(dekRaw);
+  }
+
+  // ---------- Face ID (passkey + PRF) ----------
+  const faceAvailable = !!(window.PublicKeyCredential && location.protocol === 'https:');
+  $('tglFace').addEventListener('click', async () => {
+    $('setErr').textContent = '';
+    if (meta.face) { meta.face = null; saveMeta(); syncSettings(); return; }
+    if (!meta.pin) { openPinSheet('face', () => { syncSettings(); openSheet('settings'); enrollFace(); }); return; }
+    enrollFace();
+  });
+  async function enrollFace() {
+    try {
+      $('setErr').textContent = 'Follow the Face ID prompt…';
+      const prfSalt = rand(32);
+      const userId = rand(16);
+      const cred = await navigator.credentials.create({ publicKey: {
+        challenge: rand(32),
+        rp: { name: 'Port', id: location.hostname },
+        user: { id: userId, name: 'port', displayName: 'Port' },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', userVerification: 'required' },
+        timeout: 60000,
+        extensions: { prf: { eval: { first: prfSalt } } },
+      } });
+      const ext = cred.getClientExtensionResults();
+      if (!ext.prf || !ext.prf.enabled) throw new Error('This device cannot derive a key from Face ID.');
+      const credId = b64u.enc(cred.rawId);
+      const atCreate = ext.prf.results && ext.prf.results.first;
+      const prfOut = atCreate ? new Uint8Array(atCreate) : await assertPrf(credId, prfSalt);
+      await ensureDek();
+      const key = await prfKey(prfOut);
+      meta.face = { credId, prfSalt: b64u.enc(prfSalt), wrap: await wrapDek(key, dekRaw) };
+      await saveData();
+      $('setErr').textContent = '';
+      syncSettings();
+    } catch (e) {
+      meta.face = null; saveMeta(); syncSettings();
+      $('setErr').textContent = e.name === 'NotAllowedError' ? 'Face ID was cancelled.' : (e.message || 'Face ID setup failed.');
+    }
+  }
+  async function assertPrf(credId, prfSalt) {
+    const a = await navigator.credentials.get({ publicKey: {
+      challenge: rand(32),
+      rpId: location.hostname,
+      allowCredentials: [{ type: 'public-key', id: b64u.dec(credId) }],
+      userVerification: 'required',
+      timeout: 60000,
+      extensions: { prf: { eval: { first: prfSalt } } },
+    } });
+    const ext = a.getClientExtensionResults();
+    const out = ext.prf && ext.prf.results && ext.prf.results.first;
+    if (!out) throw new Error('Face ID did not return a key.');
+    return new Uint8Array(out);
+  }
+
+  // ---------- lock screen ----------
+  let hiddenAt = 0, softLocked = false, unlocking = false;
+  function showLock(soft) {
+    softLocked = !!soft;
+    lock.classList.remove('off');
+    $('btnUnlockFace').hidden = !meta.face; $('faceGlyph').toggleAttribute('hidden', !meta.face);
+    $('btnUsePin').hidden = !meta.face || !meta.pin;
+    $('pinForm').hidden = !!meta.face; $('lockPin').value = ''; $('lockErr').textContent = '';
+  }
+  function hardLock() {
+    dek = null; dekRaw = null; data = null;
+    list.innerHTML = ''; $('total').textContent = '';
+    showLock(false);
+    closeSheets();
+  }
+  async function unlocked(rawKey) {
+    dekRaw = rawKey; dek = await importAes(rawKey);
+    const raw = LS.get('port.data');
+    data = raw && raw.enc ? await decryptData(dek, raw.enc) : (raw && raw.plain) || { accounts: [] };
+    render();
+    lock.classList.add('off');
+    softLocked = false;
+  }
+  async function unlockFace(manual) {
+    if (unlocking || !meta.face) return;
+    unlocking = true; $('lockErr').textContent = '';
+    try {
+      const prfOut = await assertPrf(meta.face.credId, b64u.dec(meta.face.prfSalt));
+      const key = await prfKey(prfOut);
+      await unlocked(await unwrapDek(key, meta.face.wrap));
+    } catch (e) {
+      const cancelled = e.name === 'NotAllowedError';
+      $('lockErr').textContent = cancelled ? '' : 'Face ID could not unlock. Use your PIN.';
+      if (meta.pin && (manual || !cancelled)) { $('pinForm').hidden = false; $('btnUsePin').hidden = true; }
+    }
+    unlocking = false;
+  }
+  async function unlockPin(pin) {
+    if (unlocking || !meta.pin) return;
+    unlocking = true; $('lockErr').textContent = '';
+    try {
+      const key = await pinKey(pin, meta.pin.salt);
+      await unlocked(await unwrapDek(key, meta.pin.wrap));
+    } catch { $('lockErr').textContent = 'Wrong PIN.'; $('lockPin').value = ''; }
+    unlocking = false;
+  }
+  $('btnUnlockFace').addEventListener('click', () => unlockFace(true));
+  $('btnUsePin').addEventListener('click', () => { $('pinForm').hidden = false; $('btnUsePin').hidden = true; setTimeout(() => $('lockPin').focus(), 50); });
+  $('pinForm').addEventListener('submit', e => { e.preventDefault(); unlockPin($('lockPin').value); });
+  $('lockPin').addEventListener('input', e => { if (meta.pin && meta.pin.len && e.target.value.length === meta.pin.len) unlockPin(e.target.value); });
+
+  document.addEventListener('visibilitychange', () => {
+    if (!lockEnabled()) return;
+    if (document.hidden) { hiddenAt = Date.now(); if (data) showLock(true); }
+    else if (softLocked) {
+      if (Date.now() - hiddenAt < 30000 && data) { lock.classList.add('off'); softLocked = false; }
+      else { hardLock(); if (meta.face) unlockFace(); }
+      if (Date.now() - lastFetch > 60000) fetchPrices();
+    } else if (Date.now() - lastFetch > 60000) fetchPrices();
+  });
+
+  // ---------- export / import ----------
+  let pendingImport = null;
+  $('btnExport').addEventListener('click', async () => {
+    const payload = { app: 'port', v: 1, exportedAt: new Date().toISOString(), base: meta.base, accounts: data.accounts };
+    const text = JSON.stringify(payload, null, 2);
+    const file = new File([text], 'port-backup.json', { type: 'application/json' });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Port backup' }); return; }
+    } catch (e) { if (e.name === 'AbortError') return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = 'port-backup.json';
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+  $('btnImport').addEventListener('click', () => { $('setErr').textContent = ''; $('fileImport').value = ''; $('fileImport').click(); });
+  $('fileImport').addEventListener('change', async e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    try {
+      pendingImport = validateImport(JSON.parse(await f.text()));
+      $('importMsg').textContent = `Replace ${data.accounts.length} account${data.accounts.length === 1 ? '' : 's'} with ${pendingImport.accounts.length} from the file?`;
+      $('importConfirm').hidden = false;
+    } catch (err) { $('setErr').textContent = err.message || 'Could not read that file.'; }
+  });
+  $('importNo').addEventListener('click', () => { pendingImport = null; $('importConfirm').hidden = true; });
+  $('importYes').addEventListener('click', async () => {
+    if (!pendingImport) return;
+    data.accounts = pendingImport.accounts;
+    if (pendingImport.base) meta.base = pendingImport.base;
+    pendingImport = null; $('importConfirm').hidden = true;
+    await saveData(); render(); closeSheets(); fetchPrices();
+  });
+
+  // ---------- pull to refresh ----------
+  let refreshing = false;
+  async function refresh() {
+    if (refreshing) return; refreshing = true;
+    ptr.classList.add('show', 'spinning');
+    scroll.classList.remove('dragging');
+    scroll.style.transform = 'translateY(56px)';
+    const started = Date.now();
+    await fetchPrices();
+    setTimeout(() => {
+      ptr.classList.remove('show', 'spinning');
+      scroll.style.transform = '';
+      refreshing = false;
+    }, Math.max(0, 600 - (Date.now() - started)));
+  }
+  let startY = null, pull = 0;
+  scroll.addEventListener('touchstart', e => { startY = scroll.scrollTop <= 0 ? e.touches[0].clientY : null; pull = 0; }, { passive: true });
+  scroll.addEventListener('touchmove', e => {
+    if (startY == null || refreshing) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0 || scroll.scrollTop > 0) { pull = 0; scroll.style.transform = ''; return; }
+    e.preventDefault();
+    pull = Math.min(dy * 0.5, 90);
+    scroll.classList.add('dragging');
+    scroll.style.transform = `translateY(${pull}px)`;
+    ptr.classList.toggle('show', pull > 12);
+    ptr.style.setProperty('--rot', (pull * 4) + 'deg');
+  }, { passive: false });
+  scroll.addEventListener('touchend', () => {
+    scroll.classList.remove('dragging');
+    if (pull >= 60) refresh(); else { scroll.style.transform = ''; ptr.classList.remove('show'); }
+    startY = null; pull = 0;
+  });
+  scroll.addEventListener('scroll', () => app.classList.toggle('scrolled', scroll.scrollTop > 4), { passive: true });
+  document.addEventListener('keydown', e => { if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !/INPUT|SELECT/.test(document.activeElement.tagName)) refresh(); });
+
+  // Keep sheets above the iOS keyboard.
+  if (window.visualViewport) {
+    const vv = window.visualViewport;
+    const onVV = () => { const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop); document.documentElement.style.setProperty('--kb', kb + 'px'); window.scrollTo(0, 0); };
+    vv.addEventListener('resize', onVV); vv.addEventListener('scroll', onVV);
+  }
+
+  // ---------- boot ----------
+  (async function boot() {
+    const theme = new URLSearchParams(location.search).get('theme');
+    if (theme) document.documentElement.dataset.theme = theme;
+    if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+    fetchPrices();
+    const raw = LS.get('port.data');
+    if (lockEnabled() && raw && raw.enc) {
+      showLock(false);
+      if (meta.face) unlockFace(); else setTimeout(() => $('lockPin').focus(), 100);
+    } else {
+      data = (raw && raw.plain) || { accounts: [] };
+      render();
+    }
+  })();
+})();
+</script>
+</body>
+</html>
